@@ -2,14 +2,23 @@ local PANEL = {};
 
 function PANEL:Init()
 	local scrW, scrH = ScrW(), ScrH();
-	local itemTable = Clockwork.item:FindByID(LocalPlayer().vohUniqueID);
+	local itemTable = Clockwork.item:FindByID(Clockwork.Client.vohUniqueID);
 
-	local defaults = {
-		loweredOrigin = Vector(itemTable.loweredOrigin.x, itemTable.loweredOrigin.y, itemTable.loweredOrigin.z);
-		loweredAngles = Angle(itemTable.loweredAngles.x, itemTable.loweredAngles.y, itemTable.loweredAngles.z);
-		attachmentOffsetVector = Vector(itemTable.attachmentOffsetVector.x, itemTable.attachmentOffsetVector.y ,itemTable.attachmentOffsetVector.z);
-		attachmentOffsetAngles = Angle(itemTable.attachmentOffsetAngles.x, itemTable.attachmentOffsetAngles.y, itemTable.attachmentOffsetAngles.z);
-	};
+	local defaults = {};
+
+	if (itemTable.AdjustAttachmentOffsetInfo) then
+		local inventoryItems = Clockwork.inventory:GetItemsByID(Clockwork.inventory.client, itemTable.uniqueID);
+
+		if (inventoryItems) then
+			for k, v in pairs(inventoryItems) do
+				v.AdjustAttachmentOffsetInfo = nil;
+			end;
+		end;
+
+		defaults.AdjustAttachmentOffsetInfo = itemTable.AdjustAttachmentOffsetInfo;
+		itemTable.AdjustAttachmentOffsetInfo = nil;
+	end;
+
 	local categories = {
 		"loweredOrigin",
 		"loweredAngles",
@@ -24,7 +33,21 @@ function PANEL:Init()
 	main:SetSizable(true);
 	main:MakePopup();
 	main.OnClose = function(panel)
+		if (defaults.AdjustAttachmentOffsetInfo) then
+			local inventoryItems = Clockwork.inventory:GetItemsByID(Clockwork.inventory.client, itemTable.uniqueID);
+
+			if (inventoryItems) then
+				for k, v in pairs(inventoryItems) do
+					v.AdjustAttachmentOffsetInfo = defaults.AdjustAttachmentOffsetInfo;
+				end;
+			end;
+
+			itemTable.AdjustAttachmentOffsetInfo = defaults.AdjustAttachmentOffsetInfo;
+		end;
+
 		for k, v in pairs(categories) do
+			if (!itemTable[v]) then continue; end;
+
 			for i=120,122 do
 				local c = string.char(i);
 
@@ -32,7 +55,7 @@ function PANEL:Init()
 			end;
 		end;
 
-		LocalPlayer().vohUniqueID = nil;
+		Clockwork.Client.vohUniqueID = nil;
 	end;
 
 	local labelPanel = vgui.Create("DPanel", main)
@@ -51,14 +74,19 @@ function PANEL:Init()
 
 	local catList = vgui.Create("DCategoryList", main);
 	catList:Dock(FILL);
-	self.loweredOriginCat = catList:Add("Lowered Origin");
-	self.loweredAnglesCat = catList:Add("Lowered Angles");
-	self.attachmentOffsetVectorCat = catList:Add("Attachment Vector");
-	self.attachmentOffsetAnglesCat = catList:Add("Attachment Angles");
 
 	local panels = {}
 
 	for k, v in pairs(categories) do
+		if (!itemTable[v]) then continue; end;
+
+		if (string.find(v, "Angle")) then
+			defaults[v] = Angle(itemTable[v].x, itemTable[v].y, itemTable[v].z);
+		else
+			defaults[v] = Vector(itemTable[v].x, itemTable[v].y, itemTable[v].z);
+		end;
+
+		self[v.."Cat"] = catList:Add("ITEM."..v);
 		self[v.."Cat"]:SetExpanded(0);
 		self[v.."Panel"] = vgui.Create("Panel");
 		panels[v] = {};
@@ -75,9 +103,9 @@ function PANEL:Init()
 			panels[v][c] = vgui.Create("DNumSlider", self[v.."Panel"]);
 			panels[v][c]:Dock(TOP);
 			panels[v][c]:DockMargin(4, 4, 4, 0);
-			if (string.find(v, "Angles")) then
-				panels[v][c]:SetMin(-180);
-				panels[v][c]:SetMax(180);
+			if (string.find(v, "Angle")) then
+				panels[v][c]:SetMin(0);
+				panels[v][c]:SetMax(360);
 			else
 				panels[v][c]:SetMin(-64);
 				panels[v][c]:SetMax(64);
@@ -99,6 +127,14 @@ function PANEL:Init()
 		end;
 
 		self[v.."Cat"]:SetContents(self[v.."Panel"]);
+	end;
+
+	for k, v in pairs(panels) do
+		if (string.find(k, "Angle")) then
+			v.x:SetText("Pitch:");
+			v.y:SetText("Yaw:");
+			v.z:SetText("Roll:");
+		end;
 	end;
 end;
 
